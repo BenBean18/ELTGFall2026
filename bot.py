@@ -16,10 +16,18 @@ bot = commands.Bot(command_prefix='>', intents=intents)
 
 @bot.command()
 async def getState(ctx):
+    """
+    Gets the state of this deck. Can restore with >setState state
+    """
     await ctx.send(f"`{decks[ctx.channel.id][1].get_state_json()}`")
 
 @bot.command()
 async def setState(ctx, *, state):
+    """
+    Sets the state of this deck.
+
+    Pass something from getState to this
+    """
     check = random.randint(0, 10000)
 
     await ctx.send(f"Confirm for {decks[ctx.channel.id][0]} by typing {check}")
@@ -35,6 +43,9 @@ async def setState(ctx, *, state):
 
 @bot.command()
 async def drawForTeam(ctx):
+    """
+    Draw a card from this deck for your team.
+    """
     red_role = discord.utils.find(lambda r: r.name == 'Red Team', ctx.message.guild.roles)
     blue_role = discord.utils.find(lambda r: r.name == 'Blue Team', ctx.message.guild.roles)
     is_red = red_role in ctx.message.author.roles
@@ -70,6 +81,9 @@ async def drawForTeam(ctx):
 
 @bot.command()
 async def drawPublic(ctx):
+    """
+    Draw a card from this deck for the public.
+    """
     red_role = discord.utils.find(lambda r: r.name == 'Red Team', ctx.message.guild.roles)
     blue_role = discord.utils.find(lambda r: r.name == 'Blue Team', ctx.message.guild.roles)
     is_red = red_role in ctx.message.author.roles
@@ -100,6 +114,9 @@ async def drawPublic(ctx):
 
 @bot.command()
 async def hand(ctx):
+    """
+    View your private hand.
+    """
     red_role = discord.utils.find(lambda r: r.name == 'Red Team', ctx.message.guild.roles)
     blue_role = discord.utils.find(lambda r: r.name == 'Blue Team', ctx.message.guild.roles)
     is_red = red_role in ctx.message.author.roles
@@ -119,6 +136,9 @@ async def hand(ctx):
 
 @bot.command()
 async def handPublic(ctx):
+    """
+    View the public hand.
+    """
     red_role = discord.utils.find(lambda r: r.name == 'Red Team', ctx.message.guild.roles)
     blue_role = discord.utils.find(lambda r: r.name == 'Blue Team', ctx.message.guild.roles)
     is_red = red_role in ctx.message.author.roles
