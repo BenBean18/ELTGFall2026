@@ -3,16 +3,17 @@ from numpy.random import Generator, PCG64
 from collections import defaultdict
 import json, copy
 
-CARDS = ["Del Rey", "Palms", "Downtown", "Pico-Robertson", "Expo Park", "Fairfax"]
-
 class Deck:
-    seed = 0x454c5447 # "ELTG" in ASCII
+    def __init__(self, cards):
+        self.CARDS = cards
+    
+        self.seed = 0x454c5447 # "ELTG" in ASCII
 
-    rg = Generator(PCG64(seed))
-    total_drawn = 0
-    drawn = defaultdict(list)
+        self.rg = Generator(PCG64(self.seed))
+        self.total_drawn = 0
+        self.drawn = defaultdict(list)
 
-    cards = []
+        self.cards = []
 
     def set_state_json(self, state):
         state_dict = json.loads(state)
@@ -24,7 +25,7 @@ class Deck:
 
     def reset(self, draw=True):
         self.rg = Generator(PCG64(self.seed))
-        self.cards = copy.deepcopy(CARDS)
+        self.cards = copy.deepcopy(self.CARDS)
         self.rg.shuffle(self.cards)
 
         if draw:
