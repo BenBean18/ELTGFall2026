@@ -3,8 +3,37 @@ import discord
 from discord.ext import commands
 import random
 
-REGIONS = ["Del Rey", "Palms", "Downtown", "Pico-Robertson", "Expo Park", "Fairfax"]
-CHALLENGES = ["Lemon", "Okaihau Express", "Bird", "Skip Rock"]
+REGIONS = list(map(str, [3,5,6,7,14,15,17,19,22,23,25,29,30,45,47,51,52,57,64,66,67,70,79,81,88,89,93,99]))
+CHALLENGES = """Skip a Stone
+Film a Bird
+Touch Grass
+Find a Geodetic Marker
+Spot a Plane
+Catch a Bug
+Paint a (Local) Landscape
+Eat an Egg
+Climb a Tree
+Communicate with Morse Code
+Flip a Bottle
+Get a Team Mascot
+Answer a Riddle
+Do a Math Minute
+Be a Squatter
+Calculate Boba
+Do a Face Cookie
+Cry
+Take Flight
+Guess the Art Age
+Taste Test a Taco Truck
+Be a Foodie
+Make a Rainbow of Flowers
+Find a Library Book
+Get a Scenic View
+Throw a Paper Airplane
+Get Lucky
+Predict Train Doors
+Do 100 Jumping Jacks
+Contemplate Deeply""".split("\n")
 
 decks = {1561264816314908742: ("region", deck.Deck(REGIONS)), 1561264835100942448: ("challenge", deck.Deck(CHALLENGES))}
 
