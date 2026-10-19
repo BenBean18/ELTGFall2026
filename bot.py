@@ -46,6 +46,10 @@ async def privateDraw(ctx):
     """
     Draw a card from this deck for your team.
     """
+    if decks[ctx.channel.id][0] == "challenge":
+        await ctx.send("Can't private draw from challenge deck!")
+        return
+
     red_role = discord.utils.find(lambda r: r.name == 'Red Team', ctx.message.guild.roles)
     blue_role = discord.utils.find(lambda r: r.name == 'Blue Team', ctx.message.guild.roles)
     is_red = red_role in ctx.message.author.roles
@@ -53,6 +57,10 @@ async def privateDraw(ctx):
 
     if is_red and is_blue:
         await ctx.send("Double agents can't draw!")
+        return
+    
+    if not (is_red or is_blue):
+        await ctx.send("Join a team!")
         return
 
     dm_channel = await ctx.message.author.create_dm()
@@ -92,6 +100,10 @@ async def draw(ctx):
     if is_red and is_blue:
         await ctx.send("Double agents can't draw!")
         return
+    
+    if not (is_red or is_blue):
+        await ctx.send("Join a team!")
+        return
 
     check = random.randint(0, 10000)
 
@@ -109,7 +121,7 @@ async def draw(ctx):
         return
     
     await ctx.send(f'Public drew {card}')
-    await handPublic(ctx)
+    await publicHand(ctx)
     await ctx.send(f'`{decks[ctx.channel.id][1].get_state_json()}`')
 
 @bot.command()
@@ -117,6 +129,10 @@ async def privateHand(ctx):
     """
     View your private hand.
     """
+    if decks[ctx.channel.id][0] == "challenge":
+        await ctx.send("No private hand for challenge deck!")
+        return
+
     red_role = discord.utils.find(lambda r: r.name == 'Red Team', ctx.message.guild.roles)
     blue_role = discord.utils.find(lambda r: r.name == 'Blue Team', ctx.message.guild.roles)
     is_red = red_role in ctx.message.author.roles
@@ -124,6 +140,10 @@ async def privateHand(ctx):
 
     if is_red and is_blue:
         await ctx.send("Double agents can't look at hands!")
+        return
+    
+    if not (is_red or is_blue):
+        await ctx.send("Join a team!")
         return
     
     dm_channel = await ctx.message.author.create_dm()
@@ -146,6 +166,10 @@ async def publicHand(ctx):
 
     if is_red and is_blue:
         await ctx.send("Double agents can't look at hands!")
+        return
+    
+    if not (is_red or is_blue):
+        await ctx.send("Join a team!")
         return
     
     hand = decks[ctx.channel.id][1].hand("Public")
