@@ -3,7 +3,8 @@ import discord
 from discord.ext import commands
 import random
 
-REGIONS = list(map(str, [3,5,6,7,14,15,17,19,22,23,25,29,30,45,47,51,52,57,64,66,67,70,79,81,88,89,93,99]))
+# REGIONS = list(map(str, [3,5,6,7,14,15,17,19,22,23,25,29,30,45,47,51,52,57,64,66,67,70,79,81,88,89,93,99]))
+REGIONS = list(map(str, [17, 47, 6, 70, 66, 81, 25, 22, 67]))
 CHALLENGES = """Skip a Stone
 Film a Bird
 Touch Grass
