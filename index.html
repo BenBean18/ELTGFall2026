@@ -904,9 +904,10 @@ function addGeoJSONLine(geojsonData, color, options = {}) {
   }
 }
 
-// --- CURRENT LOCATION MARKER ---
+// --- LIVE LOCATION TRACKING ---
 let currentLocationMarker = null;
 let currentLocationAccuracy = null;
+let locationWatchId = null;
 
 function showCurrentLocation() {
   if (!navigator.geolocation) {
@@ -914,67 +915,78 @@ function showCurrentLocation() {
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
+  // Avoid starting multiple tracking sessions
+  if (locationWatchId !== null) {
+    navigator.geolocation.clearWatch(locationWatchId);
+    locationWatchId = null;
+  }
+
+  locationWatchId = navigator.geolocation.watchPosition(
     function (position) {
       const lat = position.coords.latitude;
       const lon = position.coords.longitude;
       const accuracy = position.coords.accuracy;
-
       const location = [lat, lon];
 
-      // Remove the previous location marker and accuracy circle
+      // Create or update the location marker
       if (currentLocationMarker) {
-        map.removeLayer(currentLocationMarker);
+        currentLocationMarker.setLatLng(location);
+      } else {
+        currentLocationMarker = L.marker(location)
+          .addTo(map);
+          // .bindPopup("<b>Your current location</b>");
       }
 
+      // Create or update the accuracy circle
       if (currentLocationAccuracy) {
-        map.removeLayer(currentLocationAccuracy);
+        currentLocationAccuracy.setLatLng(location);
+        currentLocationAccuracy.setRadius(accuracy);
+      } else {
+        currentLocationAccuracy = L.circle(location, {
+          radius: accuracy,
+          color: "#136aec",
+          fillColor: "#136aec",
+          fillOpacity: 0.12,
+          weight: 2
+        }).addTo(map);
       }
 
-      // Add a marker at the current location
-      currentLocationMarker = L.marker(location)
-        .addTo(map)
-        .bindPopup("<b>Your current location</b>")
-        .openPopup();
-
-      // Show the estimated GPS accuracy
-      currentLocationAccuracy = L.circle(location, {
-        radius: accuracy,
-        color: "#136aec",
-        fillColor: "#136aec",
-        fillOpacity: 0.12,
-        weight: 2
-      }).addTo(map);
-
-      // Center the map on the current location
-      map.setView(location, Math.max(map.getZoom(), 15));
+      // Center the map on the user's location
+      // map.panTo(location);
     },
     function (error) {
       let message;
 
       switch (error.code) {
         case error.PERMISSION_DENIED:
-          message = "Location permission was denied. Allow location access in your browser settings.";
+          message = "Location permission was denied.";
           break;
         case error.POSITION_UNAVAILABLE:
           message = "Your current location is unavailable.";
           break;
         case error.TIMEOUT:
-          message = "The location request timed out. Please try again.";
+          message = "Location request timed out. Please try again.";
           break;
         default:
           message = "Unable to retrieve your current location.";
       }
 
       alert(message);
+
+      // Stop tracking if the request fails
+      if (locationWatchId !== null) {
+        navigator.geolocation.clearWatch(locationWatchId);
+        locationWatchId = null;
+      }
     },
     {
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 0
+      maximumAge: 1000
     }
   );
 }
+
 
   </script>
 </body>
