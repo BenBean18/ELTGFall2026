@@ -17,7 +17,7 @@ class Deck:
 
     def set_state_json(self, state):
         state_dict = json.loads(state)
-        self.SEED = state_dict["seed"]
+        self.seed = state_dict["seed"]
         self.drawn = defaultdict(list, state_dict["drawn"])
         self.total_drawn = state_dict["total_drawn"]
 
