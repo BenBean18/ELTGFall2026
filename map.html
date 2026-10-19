@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Leaflet Map: Nominatim Search & GeoJSON Overlay</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+
+    #map {
+      height: 500px;
+      width: 100%;
+      margin-top: 15px;
+    }
+
+    .control-panel {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 10px;
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 8px;
+    }
+
+    .panel-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    textarea {
+      height: 60px;
+      resize: vertical;
+    }
+
+    button {
+      cursor: pointer;
+      padding: 6px;
+      font-weight: bold;
+    }
+
+    .polygon-label {
+      background: rgba(255, 119, 170, 0.4);
+      border: none;
+      box-shadow: none;
+      color: #222;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      white-space: normal;
+      pointer-events: none;
+    }
+
+    .polygon-label::before {
+      display: none;
+    }
+
+    #region-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.region-button {
+  padding: 8px 12px;
+  border: 2px solid #777;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  color: #222;
+}
+
+.region-button:hover {
+  border-color: #000;
+}
+
+.region-button:focus-visible {
+  outline: 2px solid #222;
+  outline-offset: 2px;
+}
+
+.region-state-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+#region-state-status {
+  margin: 5px 0;
+  font-size: 13px;
+}
+
+
+  </style>
+</head>
+
+<body>
+
+  <h2>Leaflet Map Toolkit</h2>
+
+  <div class="control-panel">
+    <!-- Section 1: Nominatim Search -->
+    <div class="panel-section">
+      <label for="query"><strong>1. Search Places (Nominatim):</strong></label>
+
+      <input type="text" id="query" placeholder="e.g., coffee shops in London" value="coffee shops in London" />
+
+      <label>
+        <input type="checkbox" id="search-visible-bounds" />
+        Search only within the visible map area
+      </label>
+
+      <hr>
+
+      <button onclick="searchNominatim()">Search & Plot</button>
+
+      <label for="region-name">
+        <strong>Search within a region:</strong>
+      </label>
+
+      <input
+        type="text"
+        id="region-name"
+        placeholder="Enter region name"
+      />
+
+      <button onclick="searchNominatimInRegion()">
+        Search within Region
+      </button>
+    </div>
+
+    <div class="region-state-controls">
+      <button type="button" onclick="copyRegionState()">
+        Copy Region State
+      </button>
+    
+      <button type="button" onclick="loadRegionStateFromClipboard()">
+        Load Region State
+      </button>
+    </div>
+    
+    <div id="region-state-status" role="status" aria-live="polite"></div>
+    
+    <div id="region-buttons"></div>
+    
+
+    <!-- Section 2: GeoJSON Input -->
+    <!-- <div class="panel-section">
+      <label for="geojson-input"><strong>2. Overlay GeoJSON (Polygon/Feature):</strong></label>
+      <textarea id="geojson-input"
+        placeholder='Paste your {"type": "Feature", ...} or {"type": "Polygon", ...} here'></textarea>
+      <button onclick="loadGeoJSON(JSON.parse(document.getElementById('geojson-input').value.trim()))">Submit
+        Polygon</button>
+    </div> -->
+  </div>
+
+  <div id="region-buttons"></div>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@7/turf.min.js"></script>
+
+  <script src="regions.js"></script>
+  <script src="metro.js"></script>
+  <script>
+    // --- MAP VIEW PERSISTENCE ---
+    const MAP_VIEW_STORAGE_KEY = "leafletMapView";
+
+    function getSavedMapView() {
+      try {
+        const saved = localStorage.getItem(MAP_VIEW_STORAGE_KEY);
+
+        if (saved) {
+          const view = JSON.parse(saved);
+
+          if (
+            Array.isArray(view.center) &&
+            view.center.length === 2 &&
+            view.center.every(Number.isFinite) &&
+            Number.isFinite(view.zoom)
+          ) {
+            return view;
+          }
+        }
+      } catch (error) {
+        console.warn("Could not restore saved map view:", error);
+      }
+
+      return {
+        center: [20, 0],
+        zoom: 2
+      };
+    }
+
+    const initialView = getSavedMapView();
+
+    const map = L.map('map').setView(
+      initialView.center,
+      initialView.zoom
+    );
+
+    // Save the current center and zoom level
+    function saveMapView() {
+      const center = map.getCenter();
+
+      const view = {
+        center: [center.lat, center.lng],
+        zoom: map.getZoom()
+      };
+
+      try {
+        localStorage.setItem(
+          MAP_VIEW_STORAGE_KEY,
+          JSON.stringify(view)
+        );
+      } catch (error) {
+        console.warn("Could not save map view:", error);
+      }
+    }
+
+    // Save after the user pans or zooms
+    map.on("moveend", saveMapView);
+    map.on("zoomend", saveMapView);
+
+
+    // Add OpenStreetMap tile layer
+    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let loaded = false;
+
+    tileLayer.once("load", function () {
+      if (loaded) return;
+
+      loaded = true;
+
+      // Create a button for every region
+      createRegionButtons();
+
+      // Load region polygons
+      Object.values(REGIONS).forEach(region => {
+        const name = region.properties?.name;
+
+        if (!name) return;
+
+        geoJsonLayers[name] = loadGeoJSON(region);
+
+        // Ensure the saved color is applied to the loaded polygon
+        applyRegionColor(name);
+      });
+
+      // --- RENDER METRO LINES ---
+      Object.entries(LINES).forEach(([color, geojsonData]) => {
+        addGeoJSONLine(geojsonData, color);
+      });
+    });
+
+
+    // Isolated layers to hold items cleanly without mixing them up
+    const markersLayer = L.layerGroup().addTo(map);
+    let geoJsonLayers = {};
+
+    // Independent layer group for GeoJSON lines
+    const geoJsonLinesLayer = L.layerGroup().addTo(map);
+
+    // --- 1. NOMINATIM SEARCH FUNCTION ---
+    function searchNominatim() {
+      const query = document.getElementById('query').value.trim();
+
+      if (!query) return;
+
+      // Clear previous markers
+      markersLayer.clearLayers();
+
+      const baseUrl = "https://nominatim.openstreetmap.org/search";
+
+      const params = new URLSearchParams({
+        format: "json",
+        q: query,
+        limit: "100",
+        email: "your-email@example.com"
+      });
+
+      // Restrict results to the currently visible map bounds if checked
+      const restrictToBounds = document.getElementById(
+        'search-visible-bounds'
+      ).checked;
+
+      if (restrictToBounds) {
+        const bounds = map.getBounds();
+
+        // Nominatim viewbox order: left, top, right, bottom
+        params.set("viewbox", [
+          bounds.getWest(),
+          bounds.getNorth(),
+          bounds.getEast(),
+          bounds.getSouth()
+        ].join(","));
+
+        // Restrict results to the specified bounding box
+        params.set("bounded", "1");
+      }
+
+      const finalUrl = `${baseUrl}?${params.toString()}`;
+
+      fetch(finalUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.length === 0) {
+            alert("No results found in the specified area.");
+            return;
+          }
+
+          const bounds = [];
+
+          data.forEach(item => {
+            const lat = parseFloat(item.lat);
+            const lon = parseFloat(item.lon);
+
+            const marker = L.marker([lat, lon])
+              .bindPopup(item.display_name);
+
+            markersLayer.addLayer(marker);
+            bounds.push([lat, lon]);
+          });
+
+          // Zoom to the returned results only when searching globally.
+          // When bounded search is enabled, preserve the current map view.
+          if (bounds.length > 0 && !restrictToBounds) {
+            map.fitBounds(bounds);
+          }
+
+          console.log(`Found ${data.length} results.`);
+        })
+        .catch(error => {
+          console.error("Nominatim search error:", error);
+          alert("Request failed. Check the browser console for details.");
+        });
+    }
+
+    // --- REGION COLOR MANAGEMENT ---
+
+const REGION_COLORS = [
+  { name: "White",      value: "#ffffff" },
+  { name: "Yellow",     value: "#ffff00" },
+  { name: "Light red",  value: "#ff9999" },
+  { name: "Dark red",   value: "#cc0000" },
+  { name: "Light blue", value: "#99ccff" },
+  { name: "Dark blue",  value: "#0000cc" }
+];
+
+const REGION_STORAGE_KEY = "regionColors";
+
+// Load saved colors from localStorage
+let regionColors = {};
+
+try {
+  regionColors = JSON.parse(
+    localStorage.getItem(REGION_STORAGE_KEY) || "{}"
+  ) || {};
+} catch (error) {
+  console.warn("Could not load saved region colors:", error);
+  regionColors = {};
+}
+
+// Return the configured color for a region, defaulting to white
+function getRegionColor(regionName) {
+  const savedColor = regionColors[regionName];
+
+  const validColor = REGION_COLORS.find(
+    color => color.value === savedColor
+  );
+
+  return validColor ? validColor.value : REGION_COLORS[0].value;
+}
+
+// Save region colors to localStorage
+function saveRegionColors() {
+  localStorage.setItem(
+    REGION_STORAGE_KEY,
+    JSON.stringify(regionColors)
+  );
+}
+
+// Update a region's polygon and tooltip colors
+function applyRegionColor(regionName) {
+  const color = getRegionColor(regionName);
+  const geoJsonLayer = geoJsonLayers[regionName];
+
+  if (!geoJsonLayer) return;
+
+  geoJsonLayer.setStyle({
+    color: color,
+    fillColor: color,
+    weight: 3,
+    opacity: 0.8,
+    fillOpacity: 0.4
+  });
+
+  // Update tooltip backgrounds for all polygon features
+  geoJsonLayer.eachLayer(layer => {
+    const tooltip = layer.getTooltip();
+
+    if (tooltip) {
+      const element = tooltip.getElement();
+
+      if (element) {
+        element.style.backgroundColor = color;
+        element.style.color = color === "#0000cc" ? "#ffffff" : "#222222";
+      }
+    }
+  });
+
+  // Update the corresponding button
+  const button = document.querySelector(
+    `[data-region-name="${CSS.escape(regionName)}"]`
+  );
+
+  if (button) {
+    button.style.backgroundColor = color;
+    button.style.color = color === "#0000cc" ? "#ffffff" : "#222222";
+    button.title = `${regionName}: ${REGION_COLORS.find(
+      c => c.value === color
+    ).name}. Click to change color.`;
+  }
+}
+
+// Cycle to the next color
+function cycleRegionColor(regionName) {
+  const currentColor = getRegionColor(regionName);
+
+  const currentIndex = REGION_COLORS.findIndex(
+    color => color.value === currentColor
+  );
+
+  const nextIndex = (currentIndex + 1) % REGION_COLORS.length;
+
+  regionColors[regionName] = REGION_COLORS[nextIndex].value;
+
+  saveRegionColors();
+  applyRegionColor(regionName);
+}
+
+// Create a button for each region
+function createRegionButtons() {
+  const container = document.getElementById("region-buttons");
+  container.innerHTML = "";
+
+  Object.values(REGIONS).forEach(region => {
+    const regionName = region.properties?.name;
+
+    if (!regionName) return;
+
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.className = "region-button";
+    button.textContent = regionName;
+    button.dataset.regionName = regionName;
+
+    button.addEventListener("click", () => {
+      cycleRegionColor(regionName);
+    });
+
+    container.appendChild(button);
+
+    // Apply saved color to the button
+    applyRegionColor(regionName);
+  });
+}
+
+
+
+function loadGeoJSON(geojsonData) {
+  try {
+    const regionName = geojsonData.properties?.name;
+    const initialColor = regionName
+      ? getRegionColor(regionName)
+      : "#ffffff";
+
+    let geoJsonLayer = L.geoJSON(geojsonData, {
+      style: {
+        color: initialColor,
+        weight: 3,
+        opacity: 0.8,
+        fillColor: initialColor,
+        fillOpacity: 0.4
+      },
+
+      onEachFeature: function (feature, layer) {
+        const name = feature.properties?.name || "Unnamed Polygon";
+
+        if (layer instanceof L.Polygon) {
+          layer.bindTooltip(name, {
+            permanent: true,
+            direction: "center",
+            className: "polygon-label",
+            opacity: 1
+          });
+
+          // Retain the existing click behavior if desired
+          // layer.on("click", function () {
+          //   const randomColor = getRandomColor();
+          //   updatePolygonColor(layer, randomColor);
+          // });
+        }
+      }
+    }).addTo(map);
+
+    // Set tooltip backgrounds after the layer has been added
+    geoJsonLayer.eachLayer(layer => {
+      const tooltip = layer.getTooltip();
+
+      if (tooltip) {
+        const element = tooltip.getElement();
+
+        if (element) {
+          element.style.backgroundColor = initialColor;
+        }
+      }
+    });
+
+    return geoJsonLayer;
+
+  } catch (error) {
+    console.error("GeoJSON Parsing Error:", error);
+    alert("Invalid GeoJSON data.");
+  }
+}
+
+
+    // Update a polygon's color and its tooltip background
+    function updatePolygonColor(layer, color) {
+      // Update polygon style
+      layer.setStyle({
+        color: color,
+        fillColor: color
+      });
+
+      // Update tooltip background color
+      const tooltip = layer.getTooltip();
+
+      if (tooltip) {
+        tooltip.getElement()?.style.setProperty(
+          "background-color",
+          color
+        );
+      }
+    }
+
+    // Generate a random hexadecimal color
+    function getRandomColor() {
+      return "#" + Math.floor(Math.random() * 16777215)
+        .toString(16)
+        .padStart(6, "0");
+    }
+
+    // --- 3. NOMINATIM SEARCH WITHIN A NAMED REGION ---
+
+function searchNominatimInRegion() {
+  const query = document.getElementById('query').value.trim();
+  const regionName = document.getElementById('region-name').value.trim();
+
+  if (!query) {
+    alert("Please enter a search query.");
+    return;
+  }
+
+  if (!regionName) {
+    alert("Please enter a region name.");
+    return;
+  }
+
+  // Find the matching region, ignoring case
+  const region = Object.values(REGIONS).find(item => {
+    return item.properties?.name?.toLowerCase() === regionName.toLowerCase();
+  });
+
+  if (!region) {
+    alert(`Region "${regionName}" was not found in REGIONS.`);
+    return;
+  }
+
+  // Calculate the region's bounding box
+  const regionLayer = L.geoJSON(region);
+  const bounds = regionLayer.getBounds();
+
+  if (!bounds.isValid()) {
+    alert(`Region "${regionName}" has invalid boundaries.`);
+    return;
+  }
+
+  // Build the Nominatim request
+  const params = new URLSearchParams({
+    format: "json",
+    q: query,
+    limit: "40",
+    viewbox: [
+      bounds.getWest(),
+      bounds.getNorth(),
+      bounds.getEast(),
+      bounds.getSouth()
+    ].join(","),
+    bounded: "1"
+  });
+
+  const url =
+    `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+
+  fetch(url)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      return response.json();
+    })
+    .then(data => {
+      // Remove previous search markers
+      markersLayer.clearLayers();
+
+      // Keep only results actually inside the region polygon
+      const matchingResults = data.filter(item => {
+        const point = turf.point([
+          parseFloat(item.lon),
+          parseFloat(item.lat)
+        ]);
+
+        return turf.booleanPointInPolygon(point, region);
+      });
+
+      if (matchingResults.length === 0) {
+        alert(`No results found inside "${regionName}".`);
+        return;
+      }
+
+      matchingResults.forEach(item => {
+        const lat = parseFloat(item.lat);
+        const lon = parseFloat(item.lon);
+
+        L.marker([lat, lon])
+          .bindPopup(item.display_name)
+          .addTo(markersLayer);
+      });
+
+      console.log(
+        `Found ${matchingResults.length} results inside "${regionName}".`
+      );
+    })
+    .catch(error => {
+      console.error("Regional Nominatim search error:", error);
+      alert("Search failed. Check the browser console for details.");
+    });
+}
+
+// Copy the current region colors to the clipboard
+async function copyRegionState() {
+  const state = JSON.stringify(regionColors, null, 2);
+
+  try {
+    await navigator.clipboard.writeText(state);
+    document.getElementById("region-state-status").textContent =
+      "Region state copied to clipboard.";
+  } catch (error) {
+    console.error("Clipboard copy failed:", error);
+
+    // Fallback for browsers where Clipboard API is unavailable
+    prompt("Copy this region state:", state);
+  }
+}
+
+
+// Load region colors from the clipboard
+async function loadRegionStateFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    const importedState = JSON.parse(text);
+
+    if (
+      !importedState ||
+      typeof importedState !== "object" ||
+      Array.isArray(importedState)
+    ) {
+      throw new Error("Invalid region state format.");
+    }
+
+    // Validate all imported colors before changing anything
+    const validColors = new Set(
+      REGION_COLORS.map(color => color.value)
+    );
+
+    for (const [name, color] of Object.entries(importedState)) {
+      if (!Object.hasOwn(REGIONS, name)) {
+        // Region names may not be the keys of REGIONS,
+        // so validate against the region properties below.
+        const knownRegion = Object.values(REGIONS).some(
+          region => region.properties?.name === name
+        );
+
+        if (!knownRegion) {
+          throw new Error(`Unknown region: ${name}`);
+        }
+      }
+
+      if (!validColors.has(color)) {
+        throw new Error(`Invalid color for region "${name}".`);
+      }
+    }
+
+    // Apply imported colors
+    regionColors = { ...regionColors, ...importedState };
+
+    // Persist imported state
+    saveRegionColors();
+
+    // Update all region buttons and polygons
+    Object.values(REGIONS).forEach(region => {
+      const name = region.properties?.name;
+
+      if (name) {
+        applyRegionColor(name);
+      }
+    });
+
+    document.getElementById("region-state-status").textContent =
+      "Region state loaded successfully.";
+
+  } catch (error) {
+    console.error("Clipboard import failed:", error);
+
+    document.getElementById("region-state-status").textContent =
+      "Could not load region state. Check clipboard permissions and JSON format.";
+
+    alert(
+      "Unable to load region state. Make sure the clipboard contains valid JSON exported by Copy Region State."
+    );
+  }
+}
+
+// Add a GeoJSON line with a specified color
+function addGeoJSONLine(geojsonData, color, options = {}) {
+  try {
+    const lineLayer = L.geoJSON(geojsonData, {
+      style: {
+        color: color,
+        weight: options.weight ?? 5,
+        opacity: options.opacity ?? 1,
+        dashArray: options.dashArray ?? null
+      },
+
+      // Optional popup using the GeoJSON feature name
+      onEachFeature: function (feature, layer) {
+        const name = feature.properties?.name;
+
+        if (name) {
+          layer.bindPopup(name);
+        }
+      },
+
+      // Support GeoJSON containing points as well as lines
+      pointToLayer: function (feature, latlng) {
+        return L.circleMarker(latlng, {
+          radius: 4,
+          color: color,
+          fillColor: color,
+          fillOpacity: 1
+        });
+      }
+    });
+
+    // Add to the dedicated line layer group, not the regions
+    geoJsonLinesLayer.addLayer(lineLayer);
+
+    return lineLayer;
+
+  } catch (error) {
+    console.error("Error adding GeoJSON line:", error);
+    alert("Could not add the GeoJSON overlay.");
+    return null;
+  }
+}
+
+
+  </script>
+</body>
+
+</html>
