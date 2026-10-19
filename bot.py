@@ -42,7 +42,7 @@ async def setState(ctx, *, state):
     await ctx.send(f"Restored state to `{decks[ctx.channel.id][1].get_state_json()}`")
 
 @bot.command()
-async def drawForTeam(ctx):
+async def privateDraw(ctx):
     """
     Draw a card from this deck for your team.
     """
@@ -80,7 +80,7 @@ async def drawForTeam(ctx):
     await ctx.send(f'`{decks[ctx.channel.id][1].get_state_json()}`')
 
 @bot.command()
-async def drawPublic(ctx):
+async def draw(ctx):
     """
     Draw a card from this deck for the public.
     """
@@ -113,7 +113,7 @@ async def drawPublic(ctx):
     await ctx.send(f'`{decks[ctx.channel.id][1].get_state_json()}`')
 
 @bot.command()
-async def hand(ctx):
+async def privateHand(ctx):
     """
     View your private hand.
     """
@@ -135,7 +135,7 @@ async def hand(ctx):
     await dm_channel.send(f"{team}'s hand for {decks[ctx.channel.id][0]} is: **{', '.join(hand)}**")
 
 @bot.command()
-async def handPublic(ctx):
+async def publicHand(ctx):
     """
     View the public hand.
     """
