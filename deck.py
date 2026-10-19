@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-from numpy.random import Generator, PCG64
 from collections import defaultdict
 import json, copy
+from random import Random
 
 class Deck:
     def __init__(self, cards):
@@ -9,7 +9,7 @@ class Deck:
     
         self.seed = 0x454c5447 # "ELTG" in ASCII
 
-        self.rg = Generator(PCG64(self.seed))
+        self.rg = Random(self.seed)
         self.total_drawn = 0
         self.drawn = defaultdict(list)
 
@@ -24,7 +24,7 @@ class Deck:
         self.reset(draw=True)
 
     def reset(self, draw=True):
-        self.rg = Generator(PCG64(self.seed))
+        self.rg = Random(self.seed)
         self.cards = copy.deepcopy(self.CARDS)
         self.rg.shuffle(self.cards)
 
