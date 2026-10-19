@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=value, initial-scale=1.0">
   <title>Leaflet Map: Nominatim Search & GeoJSON Overlay</title>
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -113,6 +114,7 @@ button {
   min-width: 0;
   min-height: 26px;
   padding: 3px 7px;
+  margin: 0.2em;
   border: 1px solid #777;
   border-radius: 4px;
   font-size: 11px;
@@ -195,10 +197,9 @@ button {
 
 <body>
 
-  <h2>Leaflet Map Toolkit</h2>
-
   <div class="control-panel">
     <!-- Section 1: Nominatim Search -->
+    <div id="searching" hidden="true">
     <div class="panel-section">
       <label for="query"><strong>1. Search Places (Nominatim):</strong></label>
 
@@ -239,8 +240,12 @@ button {
     </div>
     
     <div id="region-state-status" role="status" aria-live="polite"></div>
+  </div>
+
+    <button onclick="document.getElementById('searching').toggleAttribute('hidden')" style="font-size: 1em">Show/Hide Search</button>
+    <button onclick="document.getElementById('region-buttons').style.display = document.getElementById('region-buttons').style.display == 'none' ? 'block' : 'none'; " style="font-size: 1em">Show/Hide Buttons</button>
     
-    <div id="region-buttons"></div>
+    <!-- <div id="region-buttons"></div> -->
     
 
     <!-- Section 2: GeoJSON Input -->
@@ -253,7 +258,7 @@ button {
     </div> -->
   </div>
 
-  <div id="region-buttons"></div>
+  <div id="region-buttons" style="display: none;"></div>
 
   <div id="map"></div>
 
@@ -455,7 +460,7 @@ button {
     // --- REGION COLOR MANAGEMENT ---
 
 const REGION_COLORS = [
-  { name: "White",      value: "#ffffff" },
+  { name: "White",      value: "#eeeeee" },
   { name: "Yellow",     value: "#ffff00" },
   { name: "Light red",  value: "#ff9999" },
   { name: "Dark red",   value: "#cc0000" },
@@ -506,7 +511,7 @@ function applyRegionColor(regionName) {
   geoJsonLayer.setStyle({
     color: color,
     fillColor: color,
-    weight: 3,
+    weight: 5,
     opacity: 0.8,
     fillOpacity: 0.4
   });
@@ -520,6 +525,7 @@ function applyRegionColor(regionName) {
 
       if (element) {
         element.style.backgroundColor = color;
+        element.style.fontSize = "1em";
         element.style.color = color === "#0000cc" ? "#ffffff" : "#222222";
       }
     }
@@ -532,6 +538,7 @@ function applyRegionColor(regionName) {
 
   if (button) {
     button.style.backgroundColor = color;
+    // button.style.fontSize = "2em";
     button.style.color = color === "#0000cc" ? "#ffffff" : "#222222";
     button.title = `${regionName}: ${REGION_COLORS.find(
       c => c.value === color
@@ -595,7 +602,7 @@ function loadGeoJSON(geojsonData) {
     let geoJsonLayer = L.geoJSON(geojsonData, {
       style: {
         color: initialColor,
-        weight: 3,
+        weight: 5,
         opacity: 0.8,
         fillColor: initialColor,
         fillOpacity: 0.4
