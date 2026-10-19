@@ -244,7 +244,10 @@ button {
 
     <button onclick="document.getElementById('searching').toggleAttribute('hidden')" style="font-size: 1em">Show/Hide Search</button>
     <button onclick="document.getElementById('region-buttons').style.display = document.getElementById('region-buttons').style.display == 'none' ? 'block' : 'none'; " style="font-size: 1em">Show/Hide Buttons</button>
-    
+    <button type="button" onclick="showCurrentLocation()">
+      📍 My Location
+    </button>
+
     <!-- <div id="region-buttons"></div> -->
     
 
@@ -901,6 +904,77 @@ function addGeoJSONLine(geojsonData, color, options = {}) {
   }
 }
 
+// --- CURRENT LOCATION MARKER ---
+let currentLocationMarker = null;
+let currentLocationAccuracy = null;
+
+function showCurrentLocation() {
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    function (position) {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      const accuracy = position.coords.accuracy;
+
+      const location = [lat, lon];
+
+      // Remove the previous location marker and accuracy circle
+      if (currentLocationMarker) {
+        map.removeLayer(currentLocationMarker);
+      }
+
+      if (currentLocationAccuracy) {
+        map.removeLayer(currentLocationAccuracy);
+      }
+
+      // Add a marker at the current location
+      currentLocationMarker = L.marker(location)
+        .addTo(map)
+        .bindPopup("<b>Your current location</b>")
+        .openPopup();
+
+      // Show the estimated GPS accuracy
+      currentLocationAccuracy = L.circle(location, {
+        radius: accuracy,
+        color: "#136aec",
+        fillColor: "#136aec",
+        fillOpacity: 0.12,
+        weight: 2
+      }).addTo(map);
+
+      // Center the map on the current location
+      map.setView(location, Math.max(map.getZoom(), 15));
+    },
+    function (error) {
+      let message;
+
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          message = "Location permission was denied. Allow location access in your browser settings.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          message = "Your current location is unavailable.";
+          break;
+        case error.TIMEOUT:
+          message = "The location request timed out. Please try again.";
+          break;
+        default:
+          message = "Unable to retrieve your current location.";
+      }
+
+      alert(message);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0
+    }
+  );
+}
 
   </script>
 </body>
